@@ -3,6 +3,8 @@ use windows::{core::{GUID, PCWSTR, VARIANT}, Win32::System::Com::{IDispatch, ITy
 
 use crate::{wide, LOCALE_USER_DEFAULT};
 
+use super::variant::SafeVariant;
+
 
 
 #[repr(u16)]
@@ -34,11 +36,11 @@ pub trait HasDispatch {
         Ok(rgdispid)
     }
 
-    fn get(&self, property_name : &str) -> Result<VARIANT> {
+    fn prop(&self, property_name : &str) -> Result<SafeVariant> {
         self.call(property_name, Invocation::Method, vec![])
     }
      
-    fn call(&self, method_name : &str, flag : Invocation, args : Vec<VARIANT>) -> Result<VARIANT> {
+    fn call(&self, method_name : &str, flag : Invocation, args : Vec<VARIANT>) -> Result<SafeVariant> {
         let dispatch = self.dispatch();
 
         let dispid = self.get_dispid(method_name)?;
@@ -59,11 +61,11 @@ pub trait HasDispatch {
                 Some(&mut exception as *mut EXCEPINFO),
                 None,
             ) {
-                bail!(format!("{:?}",exception))
+                bail!(format!("While invoking {}, encountered: {:?}",method_name, exception))
             };
         };
 
-        Ok(result)
+        Ok(SafeVariant::from(result))
     }
 
     fn get_guid(&self) -> Result<GUID> {
