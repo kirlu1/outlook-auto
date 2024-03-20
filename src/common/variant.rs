@@ -49,6 +49,7 @@ impl Drop for EvilVariant {
 }
 
 #[repr(u16)]
+#[derive(Debug)]
 pub enum SafeVariant {
     Int32(i32) = 0x03,
     Bstr(BSTR) = 0x08,
