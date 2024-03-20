@@ -61,12 +61,12 @@ impl From<VARIANT> for SafeVariant {
     fn from(value: VARIANT) -> Self {
         let evil_variant = EvilVariant::from(value);
         match evil_variant.vt {
-            // Some union variants are pointers, some are values 
+            // union variant may be pointer *OR* value
             0x03 => SafeVariant::Int32(evil_variant.union as i32),
             0x08 => SafeVariant::Bstr(unsafe { std::mem::transmute::<u64, BSTR>(evil_variant.union) }.clone()),
             0x09 => SafeVariant::Dispatch(unsafe { std::mem::transmute::<&u64, &IDispatch>(&evil_variant.union) }.clone()),
             0x0D => SafeVariant::Unknown(unsafe { std::mem::transmute::<&u64, &IUnknown>(&evil_variant.union) }.clone()),
-            x => panic!("Strange VT: {}", x)
+            x => panic!("Strange VType: {}", x)
         }
     }
 }
