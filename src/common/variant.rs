@@ -1,4 +1,27 @@
+use std::{error::Error, fmt::Display};
+
 use windows::{core::{IUnknown, BSTR, VARIANT}, Win32::System::Com::IDispatch};
+
+use crate::WinError;
+
+#[derive(Debug)]
+pub enum VariantError {
+    Opaque,
+    NullPointer,
+}
+
+impl Display for VariantError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            &VariantError::Opaque => write!(f, "Internal windows API error"),
+            VariantError::NullPointer => write!(f, "Null-pointer in non-empty VARIANT")
+        }
+    }
+}
+
+impl Error for VariantError {
+
+}
 
 #[derive(Debug)]
 #[repr(C)]
@@ -21,6 +44,10 @@ impl EvilVariant {
             union : union_variant,
             rec : 0
         }
+    }
+
+    fn is_null(&self) -> bool {
+        self.union==0
     }
 }
 
@@ -68,16 +95,19 @@ impl SafeVariant {
     }
 }
 
-impl From<VARIANT> for SafeVariant {
-    fn from(value: VARIANT) -> Self {
+impl TryFrom<VARIANT> for SafeVariant {
+    type Error = WinError;
+
+    fn try_from(value: VARIANT) -> Result<SafeVariant, WinError> {
         let evil_variant = EvilVariant::from(value);
         match evil_variant.vt {
             // union variant may be pointer *OR* value
-            0x00 => SafeVariant::Empty,
-            0x03 => SafeVariant::Int32(evil_variant.union as i32),
-            0x08 => SafeVariant::Bstr(unsafe { std::mem::transmute::<u64, BSTR>(evil_variant.union) }.clone()),
-            0x09 => SafeVariant::Dispatch(unsafe { std::mem::transmute::<&u64, &IDispatch>(&evil_variant.union) }.clone()),
-            0x0D => SafeVariant::Unknown(unsafe { std::mem::transmute::<&u64, &IUnknown>(&evil_variant.union) }.clone()),
+            0x00 => Ok(SafeVariant::Empty),
+            _ if evil_variant.is_null() => Err(WinError::VariantError(VariantError::NullPointer)),
+            0x03 => Ok(SafeVariant::Int32(evil_variant.union as i32)),
+            0x08 => Ok(SafeVariant::Bstr(unsafe { std::mem::transmute::<u64, BSTR>(evil_variant.union) }.clone())),
+            0x09 => Ok(SafeVariant::Dispatch(unsafe { std::mem::transmute::<&u64, &IDispatch>(&evil_variant.union) }.clone())),
+            0x0D => Ok(SafeVariant::Unknown(unsafe { std::mem::transmute::<&u64, &IUnknown>(&evil_variant.union) }.clone())),
             x => panic!("Strange VType: {}", x)
         }
     }
