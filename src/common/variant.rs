@@ -1,5 +1,3 @@
-use std::ptr;
-
 use windows::{core::{IUnknown, BSTR, VARIANT}, Win32::System::Com::IDispatch};
 
 #[derive(Debug)]
@@ -57,6 +55,17 @@ pub enum SafeVariant {
     Unknown(IUnknown) = 0x0D
 }
 
+impl SafeVariant {
+    fn as_u16(&self) -> u16 {
+        match self {
+            SafeVariant::Int32(_) => 0x03,
+            SafeVariant::Bstr(_) => 0x08,
+            SafeVariant::Dispatch(_) => 0x09,
+            SafeVariant::Unknown(_) => 0x0D,
+        }
+    }
+}
+
 impl From<VARIANT> for SafeVariant {
     fn from(value: VARIANT) -> Self {
         let evil_variant = EvilVariant::from(value);
@@ -71,5 +80,21 @@ impl From<VARIANT> for SafeVariant {
     }
 }
 
-// let dispatch_ref : &IDispatch = unsafe { std::mem::transmute(&public.union) };
-// Ok(DispatchObject(dispatch_ref.clone()))
+
+impl From<SafeVariant> for VARIANT {
+    fn from(value: SafeVariant) -> VARIANT {
+        let vt : u16 = value.as_u16();
+
+        // This might be very illegal
+        let union_variant = match value {
+            SafeVariant::Int32(num) => num as u64,
+            SafeVariant::Bstr(bstr) => unsafe { std::mem::transmute::<&BSTR, u64>(&bstr) },
+            SafeVariant::Dispatch(dispatch) => unsafe { std::mem::transmute::<&IDispatch, u64>(&dispatch) },
+            SafeVariant::Unknown(unknown) => unsafe { std::mem::transmute::<&IUnknown, u64>(&unknown) },
+        };
+
+        let evil_variant = EvilVariant::new(vt, union_variant);
+
+        evil_variant.into()         
+    }
+}
