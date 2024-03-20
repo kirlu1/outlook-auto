@@ -3,7 +3,7 @@ use windows::{core::{GUID, PCWSTR, VARIANT}, Win32::System::Com::{IDispatch, ITy
 
 use crate::{wide, WinError, LOCALE_USER_DEFAULT};
 
-use super::variant::{SafeVariant, VariantError};
+use super::variant::SafeVariant;
 
 #[derive(Debug)]
 pub enum DispatchError {

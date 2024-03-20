@@ -8,13 +8,18 @@ use crate::WinError;
 pub enum VariantError {
     Opaque,
     NullPointer,
+    Mismatch {
+        method : String,
+        result : SafeVariant,
+    },
 }
 
 impl Display for VariantError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             &VariantError::Opaque => write!(f, "Internal windows API error"),
-            VariantError::NullPointer => write!(f, "Null-pointer in non-empty VARIANT")
+            VariantError::NullPointer => write!(f, "Null-pointer in non-empty VARIANT"),
+            VariantError::Mismatch { method, result }  => write!(f, "{} returned {:?}", method, result,),
         }
     }
 }

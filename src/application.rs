@@ -8,7 +8,7 @@ use anyhow::{bail, Result};
 use core::cell::OnceCell;
 use std::sync::{Arc, Mutex, OnceLock};
 
-use crate::{bstr, co_initialize, common::{dispatch::{HasDispatch, Invocation}, variant::SafeVariant}, OBJECT_CONTEXT};
+use crate::{bstr, co_initialize, common::{dispatch::{HasDispatch, Invocation}, variant::{SafeVariant, VariantError}}, WinError, OBJECT_CONTEXT};
 
 
 pub struct Outlook(pub IDispatch);
@@ -28,7 +28,7 @@ impl Outlook {
         Ok(Outlook(dispatch))
     }
 
-    fn get_namespace(&self) -> IDispatch {
+    pub(crate) fn get_namespace(&self) -> IDispatch {
         let SafeVariant::Dispatch(namespace) = self.prop("Session")
             .expect("Failed to get namespace property of Application") 
         else {
@@ -37,6 +37,7 @@ impl Outlook {
         namespace
     }
 
+    // Root folder, first name on path, should be the base address in Outlook
     pub fn get_folder(&self, path_to_folder : Vec<&str>) -> Result<Folder> {
         let namespace = self.get_namespace();
 
@@ -63,7 +64,7 @@ impl HasDispatch for Outlook {
     }
 }
 
-pub struct Folder(IDispatch);
+pub struct Folder(pub IDispatch);
 
 impl Folder {
     fn get_subfolder(&self, folder_name : &str) -> Option<Folder> {
@@ -79,6 +80,43 @@ impl Folder {
         };
         
         Some(Folder(target_folder))
+    }
+
+    pub(crate) fn subfolders(&self) -> Result<Vec<String>, WinError> {
+        let mut foldernames = vec![];
+        let Ok(SafeVariant::Dispatch(subfolders)) = self.prop("Folders") else {
+            panic!("Folder should have subfolders");
+        };
+
+        let Ok(SafeVariant::Dispatch(first_folder)) = subfolders.call("GetFirst", Invocation::Method, vec![]) else {
+            return Ok(foldernames);
+        };
+
+        match first_folder.prop("Name")? {
+            SafeVariant::Bstr(name) => foldernames.push(name.to_string()),
+            result => return Err(WinError::VariantError(VariantError::Mismatch {method : "Name".to_string(), result})),
+        };
+
+        
+        loop {
+            match subfolders.call("GetNext", Invocation::Method, vec![]) {
+                Ok(SafeVariant::Dispatch(subfolder)) => {
+                    match subfolder.prop("Name")? {
+                        SafeVariant::Bstr(name) => foldernames.push(name.to_string()),
+                        result => return Err(WinError::VariantError(VariantError::Mismatch {method : "Name".to_string(), result})),
+                    }
+                },
+                Ok(result) => {
+                    return Err(WinError::VariantError(VariantError::Mismatch {method : "Name".to_string(), result}))
+                }
+                Err(WinError::VariantError(VariantError::NullPointer)) => break, // "Iterator" exhausted
+                Err(e) => return Err(e),
+            }
+        }
+
+
+        Ok(foldernames)
+
     }
 }
 
