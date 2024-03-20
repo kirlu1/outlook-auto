@@ -11,7 +11,7 @@ const LOCALE_USER_DEFAULT: u32 = 0x0400;
 static CO_INITIALIZED : OnceCell<()> = OnceCell::new();
 
 #[derive(Debug)]
-enum WinError {
+pub enum WinError {
     VariantError(VariantError),
     DispatchError(DispatchError),
     Internal(windows::core::Error)
