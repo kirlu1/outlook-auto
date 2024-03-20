@@ -49,6 +49,7 @@ impl Drop for EvilVariant {
 #[repr(u16)]
 #[derive(Debug)]
 pub enum SafeVariant {
+    Empty = 0x00,
     Int32(i32) = 0x03,
     Bstr(BSTR) = 0x08,
     Dispatch(IDispatch) = 0x09,
@@ -58,6 +59,7 @@ pub enum SafeVariant {
 impl SafeVariant {
     fn as_u16(&self) -> u16 {
         match self {
+            SafeVariant::Empty => 0x00,
             SafeVariant::Int32(_) => 0x03,
             SafeVariant::Bstr(_) => 0x08,
             SafeVariant::Dispatch(_) => 0x09,
@@ -71,6 +73,7 @@ impl From<VARIANT> for SafeVariant {
         let evil_variant = EvilVariant::from(value);
         match evil_variant.vt {
             // union variant may be pointer *OR* value
+            0x00 => SafeVariant::Empty,
             0x03 => SafeVariant::Int32(evil_variant.union as i32),
             0x08 => SafeVariant::Bstr(unsafe { std::mem::transmute::<u64, BSTR>(evil_variant.union) }.clone()),
             0x09 => SafeVariant::Dispatch(unsafe { std::mem::transmute::<&u64, &IDispatch>(&evil_variant.union) }.clone()),
@@ -80,15 +83,15 @@ impl From<VARIANT> for SafeVariant {
     }
 }
 
-
 impl From<SafeVariant> for VARIANT {
     fn from(value: SafeVariant) -> VARIANT {
         let vt : u16 = value.as_u16();
 
         // This might be very illegal
         let union_variant = match value {
+            SafeVariant::Empty => 0,
             SafeVariant::Int32(num) => num as u64,
-            SafeVariant::Bstr(bstr) => unsafe { std::mem::transmute::<&BSTR, u64>(&bstr) },
+            SafeVariant::Bstr(bstr) => unsafe { std::mem::transmute::<BSTR, u64>(bstr) },
             SafeVariant::Dispatch(dispatch) => unsafe { std::mem::transmute::<&IDispatch, u64>(&dispatch) },
             SafeVariant::Unknown(unknown) => unsafe { std::mem::transmute::<&IUnknown, u64>(&unknown) },
         };
