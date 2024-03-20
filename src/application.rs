@@ -1,11 +1,14 @@
 use windows::{
-    core::{IUnknown, Interface, GUID}, 
+    core::{IUnknown, Interface, GUID, VARIANT}, 
     Win32::System::Com::{CoCreateInstance, IDispatch}
 };
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 
-use crate::{co_initialize, common::{dispatch::HasDispatch, variant::SafeVariant}, OBJECT_CONTEXT};
+use core::cell::OnceCell;
+use std::sync::{Arc, Mutex, OnceLock};
+
+use crate::{bstr, co_initialize, common::{dispatch::{HasDispatch, Invocation}, variant::SafeVariant}, OBJECT_CONTEXT};
 
 
 pub struct Outlook(pub IDispatch);
@@ -25,9 +28,32 @@ impl Outlook {
         Ok(Outlook(dispatch))
     }
 
-    pub fn get_folder(&self, folder_chain : Vec<&str>) -> Result<Folder> {
-        
+    fn get_namespace(&self) -> IDispatch {
+        let SafeVariant::Dispatch(namespace) = self.prop("Session")
+            .expect("Failed to get namespace property of Application") 
+        else {
+            panic!("Namespace wrong VARIANT????");
+        };
+        namespace
+    }
 
+    pub fn get_folder(&self, path_to_folder : Vec<&str>) -> Result<Folder> {
+        let namespace = self.get_namespace();
+
+        let mut folder_names = path_to_folder.into_iter();
+
+        let top_folder_name = folder_names.next().expect("Folder chain cannot be empty");
+        let Some(mut subfolder) = Folder(namespace).get_subfolder(top_folder_name) else {
+            bail!("Cannot find folder {}", top_folder_name)
+        };
+
+        for folder_arg in folder_names {
+            subfolder = match subfolder.get_subfolder(folder_arg) {
+                Some(x) => x,
+                None => bail!("Cannot find folder {}", folder_arg),
+            };
+        };  
+        Ok(subfolder)
     }
 }
 
@@ -37,11 +63,23 @@ impl HasDispatch for Outlook {
     }
 }
 
-
 pub struct Folder(IDispatch);
 
 impl Folder {
-
+    fn get_subfolder(&self, folder_name : &str) -> Option<Folder> {
+        let bstr = bstr(folder_name).expect("String conversion should not fail");
+        let safevar = SafeVariant::Bstr(bstr);
+        let arg = VARIANT::from(safevar);
+        
+        let Ok(SafeVariant::Dispatch(subfolders)) = self.prop("Folders") else {
+            return None
+        };
+        let Ok(SafeVariant::Dispatch(target_folder)) = subfolders.call("Item", Invocation::PropertyGet, vec![arg]) else {
+            return None
+        };
+        
+        Some(Folder(target_folder))
+    }
 }
 
 impl HasDispatch for Folder {
