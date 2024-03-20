@@ -38,6 +38,9 @@ fn main() -> Result<()> {
         SafeVariant::Dispatch(dispatch) => {
             dbg!(dispatch);
         },
+        SafeVariant::Int32(num) => {
+            println!("Class id: {}", num);
+        }
         _ => panic!("waaaa"),
     };
 
