@@ -140,6 +140,18 @@ impl Folder {
         }
         Ok(foldernames)
     }
+
+    pub fn count(&self) -> Option<usize> {
+        let TypedVariant::Dispatch(items) = self.prop("Items").expect("Folder should have Items property") else {
+            return None
+        };
+
+        match items.prop("Count") {
+            Ok(TypedVariant::Int32(count)) => Some(count as usize),
+            Err(WinError::VariantError(VariantError::NullPointer)) => return Some(0),
+            _ => None,
+        }
+    }
 }
 
 impl HasDispatch for Folder {
