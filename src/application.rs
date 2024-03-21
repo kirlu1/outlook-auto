@@ -192,16 +192,25 @@ pub struct MailItem(IDispatch);
 
 impl MailItem {
     fn move_to(&self, target : &Folder) { // Result<_>
+        let folder_reference = VARIANT::from(TypedVariant::Dispatch(target.0.clone()));
+
 
     }
 
     // String properties
-    fn subject(&self) { // String
-        let bobo = self.prop("Subject").expect("");
+    fn string_property(&self, name : &str) -> Result<String, WinError> {
+        match self.prop(name)? {
+            TypedVariant::Bstr(string) => Ok(string.to_string()),
+            result => Err(WinError::VariantError(VariantError::Mismatch { method: name.to_string(), result })),
+        }
     }
 
-    fn body(&self) { // String
+    pub fn subject(&self) -> Result<String, WinError> { // String
+        self.string_property("Subject")
+    }
 
+    pub fn body(&self) -> Result<String, WinError> { // String
+        self.string_property("Body")
     }
 
     fn received_time(&self) { // ????
