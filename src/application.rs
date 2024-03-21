@@ -160,6 +160,33 @@ impl HasDispatch for Folder {
     }
 }
 
+pub struct MailItemIterator(IDispatch,bool);
+
+impl HasDispatch for MailItemIterator {
+    fn dispatch(&self) -> &IDispatch {
+        &self.0
+    }
+}
+
+impl Iterator for MailItemIterator {
+    type Item = MailItem;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let method = if self.1 {
+            self.1 = false;
+            "GetFirst"
+        } else {
+            "GetNext"
+        };
+        match self.call(method, Invocation::Method, vec![], false) {
+            Ok(TypedVariant::Dispatch(dispatch)) => return Some(MailItem(dispatch)),
+            Err(WinError::VariantError(VariantError::NullPointer)) => return None,
+            Ok(result) => panic!("Expected Dispatch, found {:?}", result),
+            Err(e) => panic!("Iterator failed with: {:?}", e),
+        };
+    }
+}
+
 pub struct MailItem(IDispatch);
 
 impl MailItem {
