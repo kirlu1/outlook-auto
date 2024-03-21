@@ -118,8 +118,8 @@ impl TryFrom<VARIANT> for TypedVariant {
     }
 }
 
-impl From<TypedVariant> for VARIANT {
-    fn from(value: TypedVariant) -> VARIANT {
+impl From<TypedVariant> for EvilVariant {
+    fn from(value: TypedVariant) -> EvilVariant {
         let vt : u16 = value.as_u16();
 
         // This might be very illegal
@@ -130,9 +130,13 @@ impl From<TypedVariant> for VARIANT {
             TypedVariant::Dispatch(dispatch) => unsafe { std::mem::transmute::<&IDispatch, u64>(&dispatch) },
             TypedVariant::Unknown(unknown) => unsafe { std::mem::transmute::<&IUnknown, u64>(&unknown) },
         };
+        EvilVariant::new(vt, union_variant)
+    }
+}
 
-        let evil_variant = EvilVariant::new(vt, union_variant);
 
-        evil_variant.into()         
+impl From<TypedVariant> for VARIANT {
+    fn from(value: TypedVariant) -> VARIANT {
+        EvilVariant::from(value).into()         
     }
 }
