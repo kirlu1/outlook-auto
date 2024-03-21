@@ -152,6 +152,7 @@ impl Folder {
             _ => None,
         }
     }
+        }
 }
 
 impl HasDispatch for Folder {
