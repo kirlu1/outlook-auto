@@ -10,7 +10,7 @@ pub enum VariantError {
     NullPointer,
     Mismatch {
         method : String,
-        result : SafeVariant,
+        result : TypedVariant,
     },
 }
 
@@ -80,7 +80,7 @@ impl Drop for EvilVariant {
 
 #[repr(u16)]
 #[derive(Debug)]
-pub enum SafeVariant {
+pub enum TypedVariant {
     Empty = 0x00,
     Int32(i32) = 0x03,
     Bstr(BSTR) = 0x08,
@@ -88,47 +88,47 @@ pub enum SafeVariant {
     Unknown(IUnknown) = 0x0D
 }
 
-impl SafeVariant {
+impl TypedVariant {
     fn as_u16(&self) -> u16 {
         match self {
-            SafeVariant::Empty => 0x00,
-            SafeVariant::Int32(_) => 0x03,
-            SafeVariant::Bstr(_) => 0x08,
-            SafeVariant::Dispatch(_) => 0x09,
-            SafeVariant::Unknown(_) => 0x0D,
+            TypedVariant::Empty => 0x00,
+            TypedVariant::Int32(_) => 0x03,
+            TypedVariant::Bstr(_) => 0x08,
+            TypedVariant::Dispatch(_) => 0x09,
+            TypedVariant::Unknown(_) => 0x0D,
         }
     }
 }
 
-impl TryFrom<VARIANT> for SafeVariant {
+impl TryFrom<VARIANT> for TypedVariant {
     type Error = WinError;
 
-    fn try_from(value: VARIANT) -> Result<SafeVariant, WinError> {
+    fn try_from(value: VARIANT) -> Result<TypedVariant, WinError> {
         let evil_variant = EvilVariant::from(value);
         match evil_variant.vt {
             // union variant may be pointer *OR* value
-            0x00 => Ok(SafeVariant::Empty),
+            0x00 => Ok(TypedVariant::Empty),
             _ if evil_variant.is_null() => Err(WinError::VariantError(VariantError::NullPointer)),
-            0x03 => Ok(SafeVariant::Int32(evil_variant.union as i32)),
-            0x08 => Ok(SafeVariant::Bstr(unsafe { std::mem::transmute::<u64, BSTR>(evil_variant.union) }.clone())),
-            0x09 => Ok(SafeVariant::Dispatch(unsafe { std::mem::transmute::<&u64, &IDispatch>(&evil_variant.union) }.clone())),
-            0x0D => Ok(SafeVariant::Unknown(unsafe { std::mem::transmute::<&u64, &IUnknown>(&evil_variant.union) }.clone())),
+            0x03 => Ok(TypedVariant::Int32(evil_variant.union as i32)),
+            0x08 => Ok(TypedVariant::Bstr(unsafe { std::mem::transmute::<u64, BSTR>(evil_variant.union) }.clone())),
+            0x09 => Ok(TypedVariant::Dispatch(unsafe { std::mem::transmute::<&u64, &IDispatch>(&evil_variant.union) }.clone())),
+            0x0D => Ok(TypedVariant::Unknown(unsafe { std::mem::transmute::<&u64, &IUnknown>(&evil_variant.union) }.clone())),
             x => panic!("Strange VType: {}", x)
         }
     }
 }
 
-impl From<SafeVariant> for VARIANT {
-    fn from(value: SafeVariant) -> VARIANT {
+impl From<TypedVariant> for VARIANT {
+    fn from(value: TypedVariant) -> VARIANT {
         let vt : u16 = value.as_u16();
 
         // This might be very illegal
         let union_variant = match value {
-            SafeVariant::Empty => 0,
-            SafeVariant::Int32(num) => num as u64,
-            SafeVariant::Bstr(bstr) => unsafe { std::mem::transmute::<BSTR, u64>(bstr) },
-            SafeVariant::Dispatch(dispatch) => unsafe { std::mem::transmute::<&IDispatch, u64>(&dispatch) },
-            SafeVariant::Unknown(unknown) => unsafe { std::mem::transmute::<&IUnknown, u64>(&unknown) },
+            TypedVariant::Empty => 0,
+            TypedVariant::Int32(num) => num as u64,
+            TypedVariant::Bstr(bstr) => unsafe { std::mem::transmute::<BSTR, u64>(bstr) },
+            TypedVariant::Dispatch(dispatch) => unsafe { std::mem::transmute::<&IDispatch, u64>(&dispatch) },
+            TypedVariant::Unknown(unknown) => unsafe { std::mem::transmute::<&IUnknown, u64>(&unknown) },
         };
 
         let evil_variant = EvilVariant::new(vt, union_variant);

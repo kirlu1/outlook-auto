@@ -3,13 +3,14 @@ use windows::{core::{GUID, PCWSTR, VARIANT}, Win32::System::Com::{IDispatch, ITy
 
 use crate::{wide, WinError, LOCALE_USER_DEFAULT};
 
-use super::variant::SafeVariant;
+use super::variant::TypedVariant;
 
 #[derive(Debug)]
 pub enum DispatchError {
     InvokeError {
-        exception : EXCEPINFO,
         invoked_name : String,
+        error : windows::core::Error,
+        exception : EXCEPINFO,
     },
     DispidError {
         name : String,
@@ -51,22 +52,22 @@ pub trait HasDispatch {
         Ok(rgdispid)
     }
 
-    fn prop(&self, property_name : &str) -> Result<SafeVariant, WinError> {
-        self.call(property_name, Invocation::Method, vec![])
+    fn prop(&self, property_name : &str) -> Result<TypedVariant, WinError> {
+        self.call(property_name, Invocation::PropertyGet, vec![], false)
     }
      
-    fn call(&self, method_name : &str, flag : Invocation, args : Vec<VARIANT>) -> Result<SafeVariant, WinError> {
+    fn call(&self, method_name : &str, flag : Invocation, args : Vec<VARIANT>, named_params : bool) -> Result<TypedVariant, WinError> {
         let dispatch = self.dispatch();
 
         let dispid = self.get_dispid(method_name)?;
 
-        let params = dispparams(args );
+        let params = Self::dispparams(args, named_params);
 
         let mut exception : EXCEPINFO = EXCEPINFO::default();
 
         let mut result = VARIANT::new();
         unsafe {
-            if let Err(_) = dispatch.Invoke(
+            if let Err(error) = dispatch.Invoke(
                 dispid,
                 &GUID::zeroed(),
                 LOCALE_USER_DEFAULT,
@@ -76,11 +77,11 @@ pub trait HasDispatch {
                 Some(&mut exception as *mut EXCEPINFO),
                 None,
             ) {
-                return Err(WinError::DispatchError(DispatchError::InvokeError { exception, invoked_name: method_name.to_string() }))
+                return Err(WinError::DispatchError(DispatchError::InvokeError { exception, error, invoked_name: method_name.to_string() }))
             };
         };
 
-        SafeVariant::try_from(result)
+        TypedVariant::try_from(result)
     }
 
     fn get_guid(&self) -> Result<GUID> {
@@ -94,17 +95,21 @@ pub trait HasDispatch {
         let attr : TYPEATTR = unsafe {*attr_ptr };
         Ok(attr.guid)
     }
-}
+    
+    fn dispparams(mut vars : Vec<VARIANT>, named_params : bool) -> DISPPARAMS {
+        DISPPARAMS {
+            rgvarg : vars.as_mut_ptr() as *mut VARIANT,
+            rgdispidNamedArgs : if named_params { vec![0..vars.len()].as_mut_ptr() } else { std::ptr::null_mut() } as *mut i32,
+            cArgs : (if !named_params { vars.len() } else {0}) as u32,
+            cNamedArgs : (if named_params { vars.len() } else {0}) as u32,
+        }
+    }
 
-
-fn dispparams(mut vars : Vec<VARIANT>) -> DISPPARAMS {
-    DISPPARAMS {
-        rgvarg : vars.as_mut_ptr() as *mut VARIANT,
-        rgdispidNamedArgs : std::ptr::null_mut() as *mut i32,
-        cArgs : vars.len() as u32,
-        cNamedArgs : 0,
+    fn param_info(&self, idx : usize) {
+        self.dispatch();
     }
 }
+
 
 impl HasDispatch for IDispatch {
     fn dispatch(&self) -> &IDispatch {
