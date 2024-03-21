@@ -137,6 +137,8 @@ impl From<TypedVariant> for EvilVariant {
 
 impl From<TypedVariant> for VARIANT {
     fn from(value: TypedVariant) -> VARIANT {
-        EvilVariant::from(value).into()         
+        let x = EvilVariant::from(value);
+        let result = x.into();
+        result
     }
 }

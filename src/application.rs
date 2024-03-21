@@ -8,7 +8,7 @@ use anyhow::{bail, Result};
 use core::cell::OnceCell;
 use std::sync::{Arc, Mutex, OnceLock};
 
-use crate::{bstr, co_initialize, common::{dispatch::{HasDispatch, Invocation}, variant::{TypedVariant, VariantError}}, WinError, OBJECT_CONTEXT};
+use crate::{bstr, co_initialize, common::{dispatch::{HasDispatch, Invocation}, variant::{EvilVariant, TypedVariant, VariantError}}, WinError, OBJECT_CONTEXT};
 
 
 pub struct Outlook(pub IDispatch);
@@ -67,6 +67,7 @@ impl HasDispatch for Outlook {
     }
 }
 
+#[derive(Clone)]
 pub struct Folder(pub IDispatch);
 
 impl Folder {
@@ -152,7 +153,13 @@ impl Folder {
             _ => None,
         }
     }
+
+    pub fn iter(&self) -> Result<MailItemIterator, WinError> {
+        match self.prop("Items")? {
+            TypedVariant::Dispatch(d) => Ok(MailItemIterator(d,false)),
+            result => Err(WinError::VariantError(VariantError::Mismatch { method: "Items".to_string(), result })),
         }
+    }
 }
 
 impl HasDispatch for Folder {
@@ -191,10 +198,14 @@ impl Iterator for MailItemIterator {
 pub struct MailItem(IDispatch);
 
 impl MailItem {
-    fn move_to(&self, target : &Folder) { // Result<_>
-        let folder_reference = VARIANT::from(TypedVariant::Dispatch(target.0.clone()));
+    pub fn move_to(&self, target : &Folder) -> Result<(), WinError> {
+        let dispatch_clone = target.0.cast::<IDispatch>().map_err(|e| WinError::Internal(e))?;
+        let dispatch_ptr = &dispatch_clone as *const IDispatch as u64;
+        let evar = EvilVariant::new(9, dispatch_ptr);
+        
 
-
+        self.call("Move", Invocation::Method, vec![VARIANT::from(evar)], false)?;
+        Ok(())
     }
 
     // String properties
