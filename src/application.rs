@@ -6,7 +6,7 @@ use windows::{
 use anyhow::{bail, Result};
 
 use core::cell::OnceCell;
-use std::sync::{Arc, Mutex, OnceLock};
+use std::{os::raw::c_void, sync::{Arc, Mutex, OnceLock}};
 
 use crate::{bstr, co_initialize, common::{dispatch::{HasDispatch, Invocation}, variant::{EvilVariant, TypedVariant, VariantError}}, WinError, OBJECT_CONTEXT};
 
@@ -30,7 +30,7 @@ impl Outlook {
         Ok(Outlook(dispatch))
     }
 
-    pub(crate) fn get_namespace(&self) -> IDispatch {
+    pub(crate) fn session(&self) -> IDispatch {
         let TypedVariant::Dispatch(namespace) = self.prop("Session")
             .expect("Failed to get namespace property of Application") 
         else {
@@ -41,7 +41,7 @@ impl Outlook {
 
     // Root folder, first name on path, should be the base address in Outlook
     pub fn get_folder(&self, path_to_folder : Vec<&str>) -> Result<Option<Folder>, WinError> {
-        let namespace = self.get_namespace();
+        let namespace = self.session();
 
         let mut folder_names = path_to_folder.into_iter();
 
@@ -198,13 +198,19 @@ impl Iterator for MailItemIterator {
 pub struct MailItem(IDispatch);
 
 impl MailItem {
-    pub fn move_to(&self, target : &Folder) -> Result<(), WinError> {
-        let dispatch_clone = target.0.cast::<IDispatch>().map_err(|e| WinError::Internal(e))?;
-        let dispatch_ptr = &dispatch_clone as *const IDispatch as u64;
-        let evar = EvilVariant::new(9, dispatch_ptr);
-        
+    pub fn move_to(&self, target : &mut IDispatch) -> Result<(), WinError> {
+        let unknown_object = target.cast::<IUnknown>().map_err(|e| WinError::Internal(e))?;
 
-        self.call("Move", Invocation::Method, vec![VARIANT::from(evar)], false)?;
+        let mut query_result : *mut c_void = std::ptr::null_mut();
+        let query = unsafe {unknown_object.query(&GUID::from("00020400-0000-0000-C000-000000000046"), &mut query_result as *mut *mut _) }
+            .ok().map_err(|e| WinError::Internal(e))?;
+
+        let evar = EvilVariant::new(9 | 16384, query_result as usize);
+        let native_var = VARIANT::from(evar);
+
+        let native_var = VARIANT::from("Testing subfolder");
+
+        self.call("Add", Invocation::Method, vec![native_var], false)?;
         Ok(())
     }
 

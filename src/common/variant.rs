@@ -35,12 +35,12 @@ pub struct EvilVariant {
     trash1 : u16,
     trash2 : u16,
     trash3 : u16,
-    pub union : u64,
+    pub union : usize,
     rec : usize,
 }
 
 impl EvilVariant {
-    pub fn new(vt : u16, union_variant : u64) -> Self {
+    pub fn new(vt : u16, union_variant : usize) -> Self {
         EvilVariant {
             vt,
             trash1 : 0,
@@ -110,9 +110,9 @@ impl TryFrom<VARIANT> for TypedVariant {
             0x00 => Ok(TypedVariant::Empty),
             _ if evil_variant.is_null() => Err(WinError::VariantError(VariantError::NullPointer)),
             0x03 => Ok(TypedVariant::Int32(evil_variant.union as i32)),
-            0x08 => Ok(TypedVariant::Bstr(unsafe { std::mem::transmute::<u64, BSTR>(evil_variant.union) }.clone())),
-            0x09 => Ok(TypedVariant::Dispatch(unsafe { std::mem::transmute::<&u64, &IDispatch>(&evil_variant.union) }.clone())),
-            0x0D => Ok(TypedVariant::Unknown(unsafe { std::mem::transmute::<&u64, &IUnknown>(&evil_variant.union) }.clone())),
+            0x08 => Ok(TypedVariant::Bstr(unsafe { std::mem::transmute::<usize, BSTR>(evil_variant.union) }.clone())),
+            0x09 => Ok(TypedVariant::Dispatch(unsafe { std::mem::transmute::<&usize, &IDispatch>(&evil_variant.union) }.clone())),
+            0x0D => Ok(TypedVariant::Unknown(unsafe { std::mem::transmute::<&usize, &IUnknown>(&evil_variant.union) }.clone())),
             x => panic!("Strange VType: {}", x)
         }
     }
@@ -125,10 +125,10 @@ impl From<TypedVariant> for EvilVariant {
         // This might be very illegal
         let union_variant = match value {
             TypedVariant::Empty => 0,
-            TypedVariant::Int32(num) => num as u64,
-            TypedVariant::Bstr(bstr) => unsafe { std::mem::transmute::<BSTR, u64>(bstr) },
-            TypedVariant::Dispatch(dispatch) => unsafe { std::mem::transmute::<&IDispatch, u64>(&dispatch) },
-            TypedVariant::Unknown(unknown) => unsafe { std::mem::transmute::<&IUnknown, u64>(&unknown) },
+            TypedVariant::Int32(num) => num as usize,
+            TypedVariant::Bstr(bstr) => unsafe { std::mem::transmute::<BSTR, usize>(bstr) },
+            TypedVariant::Dispatch(dispatch) => unsafe { std::mem::transmute::<&IDispatch, usize>(&dispatch) },
+            TypedVariant::Unknown(unknown) => unsafe { std::mem::transmute::<&IUnknown, usize>(&unknown) },
         };
         EvilVariant::new(vt, union_variant)
     }

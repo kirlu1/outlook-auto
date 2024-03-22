@@ -24,9 +24,9 @@ const LOCALE_USER_DEFAULT: u32 = 0x0400;
 fn main() -> Result<(), WinError> {
     let outlook = Outlook::new()?;
 
-    let folder_path = vec!["Ulrik.Hansen@student.uib.no", "Inbox"];
+    let folder_path = vec!["ulrik.h@tryg.no", "Inbox"];
 
-    let target_path = vec!["Ulrik.Hansen@student.uib.no", "Inbox", "bals"];
+    let target_path = vec!["ulrik.h@tryg.no"];
 
     let Some(inbox) = outlook.get_folder(folder_path)? else {
         return Ok(())
@@ -36,13 +36,29 @@ fn main() -> Result<(), WinError> {
         return Ok(());
     };
 
-    for message in inbox.iter()? {
+    let args = vec![];
+
+    let subfolders = match target_folder.call("Folders", Invocation::PropertyGet, args, false)? {
+        TypedVariant::Dispatch(folder) => folder,
+        result => panic!("Weird VARIANT: {:?}", result),
+    };
+
+    let args = vec![VARIANT::new(), VARIANT::from(TypedVariant::Bstr(bstr("testing new").unwrap()))];
+    subfolders.call("Add", Invocation::Method, args, false)?;
+
+    println!("{:?}", subfolders.get_guid());
+
+    std::process::exit(0);
+
+    println!("{:?}", target_folder.get_guid());
+
+
+    for message in inbox.iter()?.take(50) {
         println!("{}", message.subject()?);
-        let result = message.move_to(&target_folder);
+        let result = message.move_to(&mut target_folder.0)?;
         break
     }
 
-    println!("got here 7");
     Ok(())
 }
 
