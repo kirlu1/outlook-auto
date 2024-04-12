@@ -23,6 +23,10 @@ pub enum Invocation {
     Method = 1,
     PropertyGet = 2,
     PropertySet = 4,
+    MethodByref = 1 | 8,
+    PropertyGetByRef = 2 | 8,
+    PropertySetByRef = 4 | 8,
+    Byref = 8,
 }
 
 

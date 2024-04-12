@@ -198,19 +198,13 @@ impl Iterator for MailItemIterator {
 pub struct MailItem(IDispatch);
 
 impl MailItem {
-    pub fn move_to(&self, target : &mut IDispatch) -> Result<(), WinError> {
-        let unknown_object = target.cast::<IUnknown>().map_err(|e| WinError::Internal(e))?;
+    pub fn move_to(&self, target : Folder) -> Result<(), WinError> {
+        let folderdispatch = target.0;
 
-        let mut query_result : *mut c_void = std::ptr::null_mut();
-        let query = unsafe {unknown_object.query(&GUID::from("00020400-0000-0000-C000-000000000046"), &mut query_result as *mut *mut _) }
-            .ok().map_err(|e| WinError::Internal(e))?;
+        let args = vec![VARIANT::from(folderdispatch)];
 
-        let evar = EvilVariant::new(9 | 16384, query_result as usize);
-        let native_var = VARIANT::from(evar);
-
-        let native_var = VARIANT::from("Testing subfolder");
-
-        self.call("Add", Invocation::Method, vec![native_var], false)?;
+        self.call("Move", Invocation::MethodByref, args, false)?;
+        
         Ok(())
     }
 

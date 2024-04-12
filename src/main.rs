@@ -2,7 +2,7 @@ mod common;
 mod application;
 
 use windows::core::{IUnknown, Interface, BSTR, GUID, PCWSTR, VARIANT};
-use windows::Win32::System::Com::{CoCreateInstance, CoInitialize, IDispatch, ITypeInfo, CLSCTX};
+use windows::Win32::System::Com::{CoCreateInstance, CoInitialize, GetErrorInfo, IDispatch, IErrorInfo, ITypeInfo, CLSCTX};
 
 use anyhow::{bail, Context, Error, Result};
 
@@ -13,8 +13,6 @@ use application::Outlook;
 
 use once_cell::sync::OnceCell;
 
-use crate::application::Folder;
-
 static CO_INITIALIZED : OnceCell<()> = OnceCell::new();
 
 
@@ -24,40 +22,48 @@ const LOCALE_USER_DEFAULT: u32 = 0x0400;
 fn main() -> Result<(), WinError> {
     let outlook = Outlook::new()?;
 
-    let folder_path = vec!["ulrik.h@tryg.no", "Inbox"];
+    
 
+    let folder_path = vec!["ulrik.h@tryg.no", "Inbox"];
     let target_path = vec!["ulrik.h@tryg.no"];
 
+    let folder1_path = vec!["ulrik.h@tryg.no", "Testfolder"];
+    let folder2_path = vec!["ulrik.h@tryg.no", "Test 2"];
+
     let Some(inbox) = outlook.get_folder(folder_path)? else {
-        return Ok(())
-    };
-
+        return Ok(())    };
     let Some(target_folder) = outlook.get_folder(target_path)? else {
-        return Ok(());
+        return Ok(());    };
+    let Some(folder1) = outlook.get_folder(folder1_path)? else {
+        return Ok(());    };
+    let Some(folder2) = outlook.get_folder(folder2_path)? else {
+        return Ok(());    };
+
+    
+    let email = inbox.iter()?.next().unwrap();
+
+    let error_info = unsafe {
+        GetErrorInfo(0)
     };
+    let result = email.move_to(folder1);
 
-    let args = vec![];
+    dbg!(result);
 
-    let subfolders = match target_folder.call("Folders", Invocation::PropertyGet, args, false)? {
-        TypedVariant::Dispatch(folder) => folder,
-        result => panic!("Weird VARIANT: {:?}", result),
+    
+    match error_info {
+        Err(_) => (),
+        Ok(info) => unsafe {
+            println!(
+                "{:?}\n{:?}\n{:?}\n{:?}\n",
+                info.GetDescription().unwrap().to_string(),
+                info.GetHelpContext().unwrap().to_string(),
+                info.GetSource().unwrap().to_string(),
+                info.GetHelpFile().unwrap().to_string(),
+            )
+        }
     };
-
-    let args = vec![VARIANT::new(), VARIANT::from(TypedVariant::Bstr(bstr("testing new").unwrap()))];
-    subfolders.call("Add", Invocation::Method, args, false)?;
-
-    println!("{:?}", subfolders.get_guid());
-
-    std::process::exit(0);
-
-    println!("{:?}", target_folder.get_guid());
-
-
-    for message in inbox.iter()?.take(50) {
-        println!("{}", message.subject()?);
-        let result = message.move_to(&mut target_folder.0)?;
-        break
-    }
+    
+    
 
     Ok(())
 }
