@@ -209,11 +209,9 @@ impl Iterator for MailItemIterator {
 pub struct MailItem(pub IDispatch);
 
 impl MailItem {
-    pub fn move_to(&self, target : Folder) -> Result<(), WinError> {
-        let folderdispatch = target.0;
-
+    pub fn move_to(&self, target : &Folder) -> Result<(), WinError> {
         let params = DISPPARAMS {
-            rgvarg : &mut VARIANT::from(folderdispatch),
+            rgvarg : &mut VARIANT::from(target.0.clone()),
             cArgs : 1,
             ..Default::default()
         };
