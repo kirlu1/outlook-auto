@@ -56,18 +56,12 @@ impl Outlook {
         })
     }
 
-    pub(crate) fn session(&self) -> &IDispatch {
-        &self.namespace
-    }
-
     // Root folder, first name on path, should be the base address in Outlook
     pub fn get_folder(&self, path_to_folder : Vec<&str>) -> Result<Option<Folder>, WinError> {
-        let namespace = self.session();
-
         let mut folder_names = path_to_folder.into_iter();
 
         let top_folder_name = folder_names.next().expect("Folder chain cannot be empty");
-        let mut subfolder = match Folder(namespace).get_subfolder(top_folder_name)? {
+        let mut subfolder = match Folder(self.namespace.clone()).get_subfolder(top_folder_name)? {
             None => return Ok(None),
             Some(folder) => folder,
         };
