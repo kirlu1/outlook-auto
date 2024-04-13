@@ -209,7 +209,7 @@ impl MailItem {
             ..Default::default()
         };
 
-        self.call("Move", Invocation::MethodByref, Some(params))?;
+        self.call("Move", Invocation::Method, Some(params))?;
         
         Ok(())
     }
