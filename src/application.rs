@@ -3,8 +3,6 @@ use windows::{
     Win32::System::Com::{CLSIDFromProgID, CoCreateInstance, IDispatch, DISPATCH_METHOD, DISPATCH_PROPERTYGET, DISPPARAMS}
 };
 
-use anyhow::{bail, Result};
-
 use core::cell::OnceCell;
 use std::{os::raw::c_void, sync::{Arc, Mutex, OnceLock}};
 

@@ -1,4 +1,3 @@
-use anyhow::{bail, Context, Result};
 use windows::{core::{BSTR, GUID, PCWSTR, VARIANT}, Win32::System::Com::{IDispatch, ITypeInfo, DISPATCH_FLAGS, DISPPARAMS, EXCEPINFO, TYPEATTR}};
 
 use windows::core::w;
@@ -100,16 +99,16 @@ pub trait HasDispatch {
         )
     }
 
-    fn get_guid(&self) -> Result<GUID> {
-        let type_info : ITypeInfo = unsafe{ self.dispatch().GetTypeInfo(0, LOCALE_USER_DEFAULT) }?;
+    fn get_guid(&self) -> GUID {
+        let type_info : ITypeInfo = unsafe{ self.dispatch().GetTypeInfo(0, LOCALE_USER_DEFAULT) }.unwrap();
     
-        let attr_ptr = unsafe { type_info.GetTypeAttr()}?;
+        let attr_ptr = unsafe { type_info.GetTypeAttr()}.unwrap();
         if attr_ptr.is_null() {
-            bail!("Attribute null")
+            panic!("attribute is null")
         }
 
         let attr : TYPEATTR = unsafe {*attr_ptr };
-        Ok(attr.guid)
+        attr.guid
     }
     
     fn dispparams(mut vars : Vec<VARIANT>) -> DISPPARAMS {
