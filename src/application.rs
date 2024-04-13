@@ -11,44 +11,53 @@ use std::{os::raw::c_void, sync::{Arc, Mutex, OnceLock}};
 use crate::{bstr, co_initialize, common::{dispatch::{HasDispatch, Invocation}, variant::{EvilVariant, TypedVariant, VariantError}}, WinError, LOCALE_USER_DEFAULT, OBJECT_CONTEXT};
 
 
-pub struct Outlook(pub IDispatch);
+pub struct Outlook {
+    pub app : IDispatch,
+    pub namespace : IDispatch,
+}
 
 impl Outlook {
     pub fn new() -> Result<Self, WinError> {
         co_initialize();
     
-        let dispatch : IDispatch = unsafe {
+        let app : IDispatch = unsafe {
             let clsid = CLSIDFromProgID(w!("Outlook.Application")).expect("Couldn't get CLSID");
             CoCreateInstance(&clsid, None, OBJECT_CONTEXT)
         }.map_err(
             |e| WinError::Internal(e)
         )?;
 
-        Ok(Outlook(dispatch))
-    }
-
-    pub(crate) fn session(&self) -> IDispatch {
         let params = DISPPARAMS {
             cArgs : 1,
             rgvarg : &mut VARIANT::from("MAPI"),
             ..Default::default()
         };
 
-        let mut namespace = VARIANT::default();
+        let mut namespace_variant = VARIANT::default();
  
         unsafe {
-            self.0.Invoke(
+            app.Invoke(
                 272,
                 &GUID::zeroed(),
                 LOCALE_USER_DEFAULT,
                 DISPATCH_METHOD,
                 &params,
-                Some(&mut namespace),
+                Some(&mut namespace_variant),
                 None,
                 None,
             )
         }.unwrap();
-        IDispatch::try_from(&namespace).expect("couldnt cast VARIANT to IDispatch")
+
+        let namespace = IDispatch::try_from(&namespace_variant).expect("couldnt cast VARIANT to IDispatch");
+
+        Ok(Outlook {
+            app,
+            namespace
+        })
+    }
+
+    pub(crate) fn session(&self) -> &IDispatch {
+        &self.namespace
     }
 
     // Root folder, first name on path, should be the base address in Outlook
