@@ -165,9 +165,16 @@ impl Folder {
         }
     }
 
-    pub fn iter(&self) -> Result<MailItemIterator, WinError> {
+    pub fn emails(&self) -> Result<Vec<MailItem>, WinError> {
+        let mut items = Vec::with_capacity(self.count().unwrap_or(0));
+
+        items.extend(self.iter()?);
+        Ok(items)
+    }
+
+    fn iter(&self) -> Result<MailItemIterator, WinError> {
         match self.prop("Items")? {
-            TypedVariant::Dispatch(d) => Ok(MailItemIterator(d,false)),
+            TypedVariant::Dispatch(d) => Ok(MailItemIterator(d,true)),
             result => Err(WinError::VariantError(VariantError::Mismatch { method: "Items".to_string(), result })),
         }
     }
