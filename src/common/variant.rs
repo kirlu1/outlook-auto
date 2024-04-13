@@ -105,18 +105,17 @@ impl TypedVariant {
 impl TryFrom<VARIANT> for TypedVariant {
     type Error = WinError;
 
-    fn try_from(value: VARIANT) -> Result<TypedVariant, WinError> {
-        let evil_variant = EvilVariant::from(value);
-        match evil_variant.vt {
-            // union variant may be pointer *OR* value
-            0x00 => Ok(TypedVariant::Empty),
-            _ if evil_variant.is_null() => Err(WinError::VariantError(VariantError::NullPointer)),
-            0x03 => Ok(TypedVariant::Int32(evil_variant.union as i32)),
-            0x08 => Ok(TypedVariant::Bstr(unsafe { std::mem::transmute::<usize, BSTR>(evil_variant.union) }.clone())),
-            0x09 => Ok(TypedVariant::Dispatch(unsafe { std::mem::transmute::<&usize, &IDispatch>(&evil_variant.union) }.clone())),
-            0x0D => Ok(TypedVariant::Unknown(unsafe { std::mem::transmute::<&usize, &IUnknown>(&evil_variant.union) }.clone())),
-            x => panic!("Strange VType: {}", x)
-        }
+    fn try_from(value: VARIANT) -> Result<Self, Self::Error> {
+        let value = if let Ok(dispatch) = IDispatch::try_from(&value) {
+            TypedVariant::Dispatch(dispatch)
+        } else if let Ok(bstr) = BSTR::try_from(&value) {
+            TypedVariant::Bstr(bstr)
+        } else if let Ok(num) = i32::try_from(&value) {
+            TypedVariant::Int32(num)
+        } else {
+            return Err(WinError::VariantError(VariantError::UnsupportedVariant))
+        };
+        Ok(value)
     }
 }
 
