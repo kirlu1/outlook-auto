@@ -5,7 +5,7 @@ use windows::core::w;
 
 use crate::{wide, WinError, LOCALE_USER_DEFAULT};
 
-use super::variant::TypedVariant;
+use super::variant::{EvilVariant, TypedVariant};
 
 #[derive(Debug)]
 pub enum DispatchError {
@@ -61,7 +61,7 @@ pub trait HasDispatch {
         self.call(property_name, Invocation::PropertyGet, None)
     }
      
-    fn call(&self, method_name : &str, flag : Invocation, args : Option<DISPPARAMS>) -> Result<TypedVariant, WinError> {
+    fn call_raw(&self, method_name : &str, flag : Invocation, args : Option<DISPPARAMS>) -> Result<VARIANT, WinError> {
         let dispatch = self.dispatch();
 
         let dispid = self.get_dispid(method_name)?;
@@ -84,7 +84,20 @@ pub trait HasDispatch {
             };
         };
 
-        TypedVariant::try_from(result)
+        Ok(result)
+    }
+
+    fn call_evil(&self, method_name : &str, flag : Invocation, args : Option<DISPPARAMS>) -> Result<EvilVariant, WinError> {
+        let native = self.call_raw(method_name, flag, args)?;
+        Ok(EvilVariant::from(native))
+    }
+
+    fn call(&self, method_name : &str, flag : Invocation, args : Option<DISPPARAMS>) -> Result<TypedVariant, WinError> {
+        let native = self.call_raw(method_name, flag, args)?;
+
+        Ok(
+            TypedVariant::try_from(native)?
+        )
     }
 
     fn get_guid(&self) -> Result<GUID> {
