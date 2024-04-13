@@ -188,11 +188,11 @@ impl Iterator for MailItemIterator {
         } else {
             "GetNext"
         };
-        match self.call(method, Invocation::Method, None) {
-            Ok(TypedVariant::Dispatch(dispatch)) => return Some(MailItem(dispatch)),
-            Err(WinError::VariantError(VariantError::NullPointer)) => return None,
-            Ok(result) => panic!("Expected Dispatch, found {:?}", result),
-            Err(e) => panic!("Iterator failed with: {:?}", e),
+        match self.call_evil(method, Invocation::Method, None) {
+            Ok(EvilVariant { vt : 9, union: 0, .. })  => return None, // End of iterator is nullpointer
+            Ok(evil) if evil.vt == 9 => return Some(MailItem(IDispatch::from(evil))),
+            Ok(result) => panic!("Expected MailItem Dispatch while iterating, found {:?}", result),
+            Err(e) => panic!("MailItem Iterator failed with: {:?}", e),
         };
     }
 }

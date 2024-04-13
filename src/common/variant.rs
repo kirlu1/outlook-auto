@@ -74,6 +74,15 @@ impl From<EvilVariant> for VARIANT {
     }
 }
 
+impl From<EvilVariant> for IDispatch {
+    fn from(value: EvilVariant) -> Self {
+        assert_ne!(value.union, 0);
+        assert_eq!(value.vt, 9);
+
+        IDispatch::try_from(&VARIANT::from(value)).expect("EvilVariant not valid IDispatch")
+    }
+}
+
 impl Drop for EvilVariant {
     fn drop(&mut self) {
         
