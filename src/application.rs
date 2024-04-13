@@ -1,6 +1,6 @@
 use windows::{
-    core::{IUnknown, Interface, GUID, VARIANT}, 
-    Win32::System::Com::{CoCreateInstance, IDispatch}
+    core::{w, IUnknown, Interface, GUID, VARIANT}, 
+    Win32::System::Com::{CLSIDFromProgID, CoCreateInstance, IDispatch, DISPATCH_METHOD, DISPATCH_PROPERTYGET, DISPPARAMS}
 };
 
 use anyhow::{bail, Result};
@@ -8,7 +8,7 @@ use anyhow::{bail, Result};
 use core::cell::OnceCell;
 use std::{os::raw::c_void, sync::{Arc, Mutex, OnceLock}};
 
-use crate::{bstr, co_initialize, common::{dispatch::{HasDispatch, Invocation}, variant::{EvilVariant, TypedVariant, VariantError}}, WinError, OBJECT_CONTEXT};
+use crate::{bstr, co_initialize, common::{dispatch::{HasDispatch, Invocation}, variant::{EvilVariant, TypedVariant, VariantError}}, WinError, LOCALE_USER_DEFAULT, OBJECT_CONTEXT};
 
 
 pub struct Outlook(pub IDispatch);
@@ -17,26 +17,38 @@ impl Outlook {
     pub fn new() -> Result<Self, WinError> {
         co_initialize();
     
-        let class_id = GUID::from("0006F03A-0000-0000-C000-000000000046");
-        let raw_ptr = &class_id as *const GUID;
-    
-        let unknown : IUnknown  =  unsafe { CoCreateInstance(raw_ptr, None, OBJECT_CONTEXT) }.map_err(
-          |e| WinError::Internal(e)  
-        )?;
-        
-        let dispatch : IDispatch = unknown.cast().map_err(
+        let dispatch : IDispatch = unsafe {
+            let clsid = CLSIDFromProgID(w!("Outlook.Application")).expect("Couldn't get CLSID");
+            CoCreateInstance(&clsid, None, OBJECT_CONTEXT)
+        }.map_err(
             |e| WinError::Internal(e)
         )?;
+
         Ok(Outlook(dispatch))
     }
 
     pub(crate) fn session(&self) -> IDispatch {
-        let TypedVariant::Dispatch(namespace) = self.prop("Session")
-            .expect("Failed to get namespace property of Application") 
-        else {
-            panic!("Namespace wrong VARIANT????");
+        let params = DISPPARAMS {
+            cArgs : 1,
+            rgvarg : &mut VARIANT::from("MAPI"),
+            ..Default::default()
         };
-        namespace
+
+        let mut namespace = VARIANT::default();
+ 
+        unsafe {
+            self.0.Invoke(
+                272,
+                &GUID::zeroed(),
+                LOCALE_USER_DEFAULT,
+                DISPATCH_METHOD,
+                &params,
+                Some(&mut namespace),
+                None,
+                None,
+            )
+        }.unwrap();
+        IDispatch::try_from(&namespace).expect("couldnt cast VARIANT to IDispatch")
     }
 
     // Root folder, first name on path, should be the base address in Outlook
@@ -72,39 +84,29 @@ pub struct Folder(pub IDispatch);
 
 impl Folder {
     pub fn get_subfolder(&self, folder_name : &str) -> Result<Option<Folder>, WinError> {
-        let subfolders = match self.prop("Folders") {
-            Ok(TypedVariant::Dispatch(d)) => d,
-            Ok(result) => return Err(WinError::VariantError(VariantError::Mismatch { method: "Folders".to_string(), result })),
-            Err(e) => return Err(e),
+        let params = DISPPARAMS {
+            cArgs : 1,
+            rgvarg : &mut VARIANT::from(folder_name),
+            ..Default::default()
         };
 
-        let first_folder = match subfolders.call("GetFirst", Invocation::Method, vec![], false)? {
-            TypedVariant::Dispatch(dispatch) => dispatch,
-            result => return Err(WinError::VariantError(VariantError::Mismatch { method: "GetFirst".to_string(), result })),
-        };
+        let dispid = self.get_dispid("Folders")?;
+        let mut folder = VARIANT::default();
 
-        match first_folder.prop("Name")? {
-            TypedVariant::Bstr(name) if &name.to_string() == folder_name => return Ok(Some(Folder(first_folder))),
-            TypedVariant::Bstr(name) => (),
-            result => return Err(WinError::VariantError(VariantError::Mismatch {method : "Name".to_string(), result})),
-        };
-
-        loop {
-            match subfolders.call("GetNext", Invocation::Method, vec![], false) {
-                Ok(TypedVariant::Dispatch(subfolder)) => {
-                    match subfolder.prop("Name")? {
-                        TypedVariant::Bstr(name) if &name.to_string() == folder_name => return Ok(Some(Folder(subfolder))),
-                        TypedVariant::Bstr(name) => (),
-                        result => return Err(WinError::VariantError(VariantError::Mismatch {method : "Name".to_string(), result})),
-                    };
-                },
-                Ok(result) => {
-                    return Err(WinError::VariantError(VariantError::Mismatch {method : "Name".to_string(), result}))
-                }
-                Err(WinError::VariantError(VariantError::NullPointer)) => return Ok(None), // "Iterator" exhausted
-                Err(e) => return Err(e),
-            }
+        unsafe {
+            self.0.Invoke(
+                dispid,
+                &GUID::zeroed(),
+                LOCALE_USER_DEFAULT,
+                DISPATCH_PROPERTYGET,
+                &params,
+                Some(&mut folder),
+                None,
+                None,
+            ).unwrap()
         }
+
+        return Ok(Some(Folder(IDispatch::try_from(&folder).expect("couldnt cast VARIANT to foldere dispatch"))));
     }
 
     pub(crate) fn subfolder_names(&self) -> Result<Vec<String>, WinError> {
@@ -115,7 +117,7 @@ impl Folder {
             Err(e) => return Err(e),
         };
 
-        let Ok(TypedVariant::Dispatch(first_folder)) = subfolders.call("GetFirst", Invocation::Method, vec![], false) else {
+        let Ok(TypedVariant::Dispatch(first_folder)) = subfolders.call("GetFirst", Invocation::Method, None) else {
             return Ok(foldernames);
         };
 
@@ -125,7 +127,7 @@ impl Folder {
         };
 
         loop {
-            match subfolders.call("GetNext", Invocation::Method, vec![], false) {
+            match subfolders.call("GetNext", Invocation::Method, None) {
                 Ok(TypedVariant::Dispatch(subfolder)) => {
                     match subfolder.prop("Name")? {
                         TypedVariant::Bstr(name) => foldernames.push(name.to_string()),
@@ -186,7 +188,7 @@ impl Iterator for MailItemIterator {
         } else {
             "GetNext"
         };
-        match self.call(method, Invocation::Method, vec![], false) {
+        match self.call(method, Invocation::Method, None) {
             Ok(TypedVariant::Dispatch(dispatch)) => return Some(MailItem(dispatch)),
             Err(WinError::VariantError(VariantError::NullPointer)) => return None,
             Ok(result) => panic!("Expected Dispatch, found {:?}", result),
@@ -195,15 +197,19 @@ impl Iterator for MailItemIterator {
     }
 }
 
-pub struct MailItem(IDispatch);
+pub struct MailItem(pub IDispatch);
 
 impl MailItem {
     pub fn move_to(&self, target : Folder) -> Result<(), WinError> {
         let folderdispatch = target.0;
 
-        let args = vec![VARIANT::from(folderdispatch)];
+        let params = DISPPARAMS {
+            rgvarg : &mut VARIANT::from(folderdispatch),
+            cArgs : 1,
+            ..Default::default()
+        };
 
-        self.call("Move", Invocation::MethodByref, args, false)?;
+        self.call("Move", Invocation::MethodByref, Some(params))?;
         
         Ok(())
     }
