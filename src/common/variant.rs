@@ -142,3 +142,14 @@ impl From<TypedVariant> for VARIANT {
         result
     }
 }
+
+
+pub fn opt_out_arg() -> VARIANT {
+    let ev = EvilVariant {
+        vt : 10,
+        union : 0x80020004,
+        ..Default::default()
+    };
+
+    VARIANT::from(ev)
+}
