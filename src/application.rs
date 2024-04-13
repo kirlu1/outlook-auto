@@ -112,10 +112,10 @@ impl Folder {
                 Some(&mut folder),
                 None,
                 None,
-            ).unwrap()
+            ).map_err(|e| WinError::Internal(e))?
         }
 
-        return Ok(Some(Folder(IDispatch::try_from(&folder).expect("couldnt cast VARIANT to foldere dispatch"))));
+        return Ok(Some(Folder(IDispatch::try_from(&folder).expect("couldnt cast VARIANT to folder dispatch"))));
     }
 
     pub(crate) fn subfolder_names(&self) -> Result<Vec<String>, WinError> {
