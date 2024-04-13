@@ -84,7 +84,7 @@ impl Outlook {
 
 impl HasDispatch for Outlook {
     fn dispatch(&self) -> &IDispatch {
-        &self.0
+        &self.app
     }
 }
 
