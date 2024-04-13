@@ -12,6 +12,7 @@ pub enum VariantError {
         method : String,
         result : TypedVariant,
     },
+    UnsupportedVariant
 }
 
 impl Display for VariantError {
@@ -19,6 +20,7 @@ impl Display for VariantError {
         match self {
             &VariantError::Opaque => write!(f, "Internal windows API error"),
             VariantError::NullPointer => write!(f, "Null-pointer in non-empty VARIANT"),
+            &VariantError::UnsupportedVariant => write!(f, "VARIANT not represented by enum"),
             VariantError::Mismatch { method, result }  => write!(f, "{} returned {:?}", method, result,),
         }
     }
@@ -28,7 +30,7 @@ impl Error for VariantError {
 
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 #[repr(C)]
 pub struct EvilVariant {
     pub vt : u16,
