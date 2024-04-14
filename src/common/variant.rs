@@ -32,17 +32,17 @@ impl Error for VariantError {
 
 #[derive(Debug, Default)]
 #[repr(C)]
-pub struct EvilVariant {
-    pub vt : u16,
+pub(crate) struct EvilVariant {
+    pub(crate) vt : u16,
     trash1 : u16,
     trash2 : u16,
     trash3 : u16,
-    pub union : usize,
+    pub(crate) union : usize,
     rec : usize,
 }
 
 impl EvilVariant {
-    pub fn new(vt : u16, union_variant : usize) -> Self {
+    fn new(vt : u16, union_variant : usize) -> Self {
         EvilVariant {
             vt,
             trash1 : 0,
@@ -91,7 +91,7 @@ impl Drop for EvilVariant {
 
 #[repr(u16)]
 #[derive(Debug)]
-pub enum TypedVariant {
+pub(crate) enum TypedVariant {
     Empty = 0x00,
     Int32(i32) = 0x03,
     Bstr(BSTR) = 0x08,
@@ -153,8 +153,7 @@ impl From<TypedVariant> for VARIANT {
     }
 }
 
-
-pub fn opt_out_arg() -> VARIANT {
+fn opt_out_arg() -> VARIANT {
     let ev = EvilVariant {
         vt : 10,
         union : 0x80020004,

@@ -1,5 +1,5 @@
 mod common;
-mod application;
+pub mod application;
 
 use common::{dispatch::DispatchError, variant::VariantError};
 use once_cell::sync::OnceCell;

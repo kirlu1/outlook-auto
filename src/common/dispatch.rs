@@ -7,7 +7,7 @@ use crate::{wide, WinError, LOCALE_USER_DEFAULT};
 use super::variant::{EvilVariant, TypedVariant};
 
 #[derive(Debug)]
-pub enum DispatchError {
+pub(crate) enum DispatchError {
     InvokeError {
         invoked_name : String,
         error : windows::core::Error,
@@ -20,7 +20,7 @@ pub enum DispatchError {
 }
 
 #[repr(u16)]
-pub enum Invocation {
+pub(crate) enum Invocation {
     Method = 1,
     PropertyGet = 2,
     PropertySet = 4,
@@ -31,7 +31,7 @@ pub enum Invocation {
 }
 
 
-pub trait HasDispatch {
+pub(crate) trait HasDispatch {
     fn dispatch(&self) -> &IDispatch;
 
     fn get_dispid(&self, member_name : &str) -> Result<i32, WinError> {

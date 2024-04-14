@@ -1,2 +1,2 @@
 pub mod variant;
-pub mod dispatch;
+pub(crate) mod dispatch;

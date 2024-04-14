@@ -205,7 +205,7 @@ impl Iterator for MailItemIterator {
     }
 }
 
-pub struct MailItem(pub IDispatch);
+pub struct MailItem(IDispatch);
 
 impl MailItem {
     pub fn move_to(&self, target : &Folder) -> Result<(), WinError> {
