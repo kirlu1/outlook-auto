@@ -1,12 +1,13 @@
 use windows::{
-    core::{w, IUnknown, Interface, GUID, VARIANT}, 
+    core::{w, GUID, VARIANT}, 
     Win32::System::Com::{CLSIDFromProgID, CoCreateInstance, IDispatch, DISPATCH_METHOD, DISPATCH_PROPERTYGET, DISPPARAMS}
 };
 
-use core::cell::OnceCell;
-use std::{os::raw::c_void, sync::{Arc, Mutex, OnceLock}};
-
-use crate::{bstr, co_initialize, common::{dispatch::{HasDispatch, Invocation}, variant::{EvilVariant, TypedVariant, VariantError}}, WinError, LOCALE_USER_DEFAULT, OBJECT_CONTEXT};
+use crate::{
+    co_initialize, 
+    common::{dispatch::{HasDispatch, Invocation}, 
+    variant::{EvilVariant, TypedVariant, VariantError}}, 
+    WinError, LOCALE_USER_DEFAULT, OBJECT_CONTEXT};
 
 
 pub struct Outlook {

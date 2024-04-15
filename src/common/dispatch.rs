@@ -1,6 +1,4 @@
-use windows::{core::{BSTR, GUID, PCWSTR, VARIANT}, Win32::System::Com::{IDispatch, ITypeInfo, DISPATCH_FLAGS, DISPPARAMS, EXCEPINFO, TYPEATTR}};
-
-use windows::core::w;
+use windows::{core::{GUID, VARIANT}, Win32::System::Com::{IDispatch, ITypeInfo, DISPATCH_FLAGS, DISPPARAMS, EXCEPINFO, TYPEATTR}};
 
 use crate::{wide, WinError, LOCALE_USER_DEFAULT};
 
@@ -131,10 +129,6 @@ pub(crate) trait HasDispatch {
             cArgs : vars.len() as u32,
             ..Default::default()
         }
-    }
-
-    fn param_info(&self, idx : usize) {
-        self.dispatch();
     }
 }
 

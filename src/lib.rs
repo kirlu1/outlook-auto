@@ -3,7 +3,7 @@ pub mod application;
 
 use common::{dispatch::DispatchError, variant::VariantError};
 use once_cell::sync::OnceCell;
-use windows::{core::{BSTR, PCWSTR}, Win32::System::Com::{CoInitialize, CLSCTX, EXCEPINFO}};
+use windows::{core::{BSTR, PCWSTR}, Win32::System::Com::{CoInitialize, CLSCTX}};
 
 const OBJECT_CONTEXT: CLSCTX = windows::Win32::System::Com::CLSCTX_LOCAL_SERVER;
 const LOCALE_USER_DEFAULT: u32 = 0x0400;
