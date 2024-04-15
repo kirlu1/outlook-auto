@@ -7,7 +7,7 @@ use crate::{wide, WinError, LOCALE_USER_DEFAULT};
 use super::variant::{EvilVariant, TypedVariant};
 
 #[derive(Debug)]
-pub(crate) enum DispatchError {
+pub enum DispatchError {
     InvokeError {
         invoked_name : String,
         error : windows::core::Error,
@@ -18,6 +18,20 @@ pub(crate) enum DispatchError {
         error : windows::core::Error,
     }
 }
+
+impl std::fmt::Display for DispatchError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::InvokeError { invoked_name, error, exception } => 
+            write!(f, 
+                "Invoked name : {}, error : {}, EXCEPINFO : {:?}", invoked_name, error, exception),
+            Self::DispidError { name, error } => 
+            write!(f,
+                "Name : {}, error : {}", name, error)
+        }
+    }
+}
+
 
 #[repr(u16)]
 pub(crate) enum Invocation {

@@ -17,6 +17,27 @@ pub enum WinError {
     Internal(windows::core::Error)
 }
 
+impl std::fmt::Display for WinError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::VariantError(e) => write!(f, "{}", e),
+            Self::DispatchError(e) => write!(f, "{}", e),
+            Self::Internal(e) => write!(f, "{}", e),
+        }
+    }
+}
+
+
+impl std::error::Error for WinError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        None
+    }
+
+    fn cause(&self) -> Option<&dyn std::error::Error> {
+        self.source()
+    }
+}
+
 
 fn wide(rstr : &str) -> PCWSTR {
     let utf16 : Vec<u16> = rstr.encode_utf16().chain(std::iter::once(0)).collect();
