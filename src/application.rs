@@ -237,12 +237,12 @@ impl MailItem {
         self.string_property("Body")
     }
 
-    fn received_time(&self) { // ????
-
+    pub fn received_time(&self) -> Result<String, WinError> {
+        self.string_property("ReceivedTime")
     }
 
-    fn sender_address(&self) { // String
-
+    pub fn sender_address(&self) -> Result<String, WinError> {
+        self.string_property("SenderEmailAddress")
     }
 }
 
