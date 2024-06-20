@@ -209,6 +209,7 @@ impl Iterator for MailItemIterator {
 pub struct MailItem(IDispatch);
 
 impl MailItem {
+    /// Moves the MailItem to the given Outlook folder
     pub fn move_to(&self, target : &Folder) -> Result<(), WinError> {
         let params = DISPPARAMS {
             rgvarg : &mut VARIANT::from(target.0.clone()),
@@ -229,11 +230,13 @@ impl MailItem {
         }
     }
 
-    pub fn subject(&self) -> Result<String, WinError> { // String
+    /// Returns email subject line
+    pub fn subject(&self) -> Result<String, WinError> {
         self.string_property("Subject")
     }
 
-    pub fn body(&self) -> Result<String, WinError> { // String
+    /// Returns entire email body as a string
+    pub fn body(&self) -> Result<String, WinError> {
         self.string_property("Body")
     }
 
